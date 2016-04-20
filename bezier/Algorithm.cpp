@@ -11,6 +11,8 @@ using namespace Gdiplus;
 */
 #define min(a,b) (a<b?a:b)
 float square(float f) { return f*f; }
+float cubic(float f) { return f * square(f); } 
+
 float distance(AlPoint p1, AlPoint p2) {
 	return sqrt( square(p1.x-p2.x) + square(p1.y-p2.y) );
 }

@@ -203,17 +203,16 @@ void drawOneBezier(HDC hdc,AlPoint b, AlPoint e, AlPoint c1,AlPoint c2,bool nega
 	point[1] = ALPointToPoint(c1,negative);
 	point[2] = ALPointToPoint(c2,negative);
 	point[3] = ALPointToPoint(e, negative);
-
 	HPEN pen =CreatePen(PS_SOLID, 1, RGB(0xa0,0xa0,0xa0));
 	HPEN oldPen = (HPEN)SelectObject(hdc,pen);
 	MoveToEx(hdc, point[0].x, point[0].y, NULL);
 	LineTo(hdc, point[3].x, point[3].y);
-	//MoveToEx(hdc, point[1].x, point[1].y, NULL);
-	//LineTo(hdc, point[2].x, point[2].y);
-	//Ellipse(hdc,point[1].x-4,point[1].y-4,point[1].x+4,point[1].y+4);
-	//Ellipse(hdc,point[2].x-4,point[2].y-4,point[2].x+4,point[2].y+4);
 	SelectObject(hdc, oldPen);
+#if 1
+	myPolyBezier(hdc,b,e,c1,c2,negative);
+#else 
 	PolyBezier(hdc,point,4); 
+#endif
 }
 
 void drawBezier(HDC hdc, Points &points, float f, COLORREF color, int width, int d) {
@@ -226,24 +225,37 @@ void drawBezier(HDC hdc, Points &points, float f, COLORREF color, int width, int
 		b = points[i-2];
 		e = points[i-1];
 		n = points[i];
-		c1 = c3;
-		b.y = -b.y;
-		e.y = -e.y;
-		n.y = -n.y;
+		c1 = c3; b.y = -b.y; e.y = -e.y; n.y = -n.y;
 		c2 = bezierControlPoint(b, e, n, &c3, 0.2);
 		drawOneBezier(hdc,b,e,c1,c2,true);
 	}
 	b = points[points.count()-2];
 	e = points[points.count()-1];
-	c1 = c3;
-	c1.y = -c1.y;
-	c2 = e;
+	c1 = c3; c1.y = -c1.y; c2 = e;
 	drawOneBezier(hdc,b,e,c1,c2,false);
 	DeleteObject( SelectObject(hdc,hobj) );
 }
 
-void myPolyBezier(HDC hdc,AlPoint b, AlPoint e, AlPoint c1, AlPoint c2) {
-	int n = distance(b, e)/4;
-
+void myPolyBezier(HDC hdc,AlPoint b, AlPoint e, AlPoint c1, AlPoint c2,bool negative) {
+	float t = 0.02;
+	MoveToEx(hdc, b.x, (negative?-1:1)*b.y, NULL);
+	while(t <= 1){
+		AlPoint	alp = bezierPoint(b,e,c1,c2,t);
+		alp.y = (negative?-1:1)*alp.y;
+		t += 0.02;
+		LineTo(hdc,alp.x,alp.y);
+	}
 }
 
+// b(t) = p0*(1-t)^3 + 3p1*t*(1-t)^2 + 3*p2*t^2(1-t) + p3*t^3
+float p0(float v, float t){ return v * cubic(1-t); }
+float p1(float v, float t){ return 3 * v * t * square( 1-t ); }
+float p2(float v, float t){ return 3 * v * square(t) * (1-t); }
+float p3(float v, float t){ return v * cubic(t); }
+AlPoint bezierPoint(AlPoint b, AlPoint e, AlPoint c1, AlPoint c2, float t){
+	AlPoint point = {
+		p0(b.x,t) + p1(c1.x,t) + p2(c2.x,t) + p3(e.x,t),
+		p0(b.y,t) + p1(c1.y,t) + p2(c2.y,t) + p3(e.y,t)
+	};
+	return point;
+}
