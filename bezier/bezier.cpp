@@ -6,6 +6,9 @@
 #include <windows.h>
 #include <stdio.h>
 #include <math.h>
+#include <GdiPlus.h>
+using namespace Gdiplus;
+#pragma comment(lib, "gdiplus.lib")
 
 #define RadianToAngle(r) (int)(0.5 + 180*(r/M_PI))
 #define MAX_LOADSTRING 100
@@ -168,8 +171,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
-}
-
+} 
 
 int main(int argcount, void *args){
 	HINSTANCE instance = GetModuleHandle(NULL);
@@ -177,48 +179,62 @@ int main(int argcount, void *args){
 }
 
 void OnPaintTest(HDC hdc) {
-	AlPoint lefttop = {100, 100};
+	ALPoint lefttop = {100, 100};
 	int length = 200;
-	Points points(20, 5);
+	ALArrPoints points(20, 5);
 	// 首先假设只有3个点!!!!!
-	points.append(200, 90);
-	points.append(340, 170);
-	points.append(360, 260);
-	points.append(300, 340);
-	points.append(100, 180);
-	points.append(250, 200);
+	points.append(200, 90, 1);
+	points.append(340, 170,10);
+	points.append(360, 260,6);
+	points.append(300, 340,8);
+	points.append(100, 180,3);
+	points.append(250, 200,0);
 	drawBezier(hdc, points, 0.3, RGB(0xff,0,0), 1, 3);
 }
 
-POINT ALPointToPoint(AlPoint p,bool negative)
+class GdiPlusIniter{
+public:
+	GdiPlusIniter() {
+		Gdiplus::GdiplusStartupInput StartupInput;  
+		m_ok = GdiplusStartup(&m_gdiplusToken,&StartupInput,NULL); 
+	}
+	~GdiPlusIniter(){
+		Gdiplus::GdiplusShutdown(m_gdiplusToken);
+	}
+	bool ok(){return m_ok==Status::Ok;}
+private:
+	ULONG_PTR m_gdiplusToken;
+	Gdiplus::Status m_ok;
+}; 
+POINT alpointToPoint(ALPoint p,bool negative)
 {
 	int n = negative?-1:1;
-	POINT r = {(long)p.x,n*(long)p.y};
+	POINT r = {(long)p.x, n*(long)p.y};
 	return r;
 }
 
-void drawOneBezier(HDC hdc,AlPoint b, AlPoint e, AlPoint c1,AlPoint c2,bool negative){
+void drawOneBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1,ALPoint c2,bool negative){
 	POINT point[4];
-	point[0] = ALPointToPoint(b, negative);
-	point[1] = ALPointToPoint(c1,negative);
-	point[2] = ALPointToPoint(c2,negative);
-	point[3] = ALPointToPoint(e, negative);
+	point[0] = alpointToPoint(b, negative);
+	point[1] = alpointToPoint(c1,negative);
+	point[2] = alpointToPoint(c2,negative);
+	point[3] = alpointToPoint(e, negative);
 	HPEN pen =CreatePen(PS_SOLID, 1, RGB(0xa0,0xa0,0xa0));
 	HPEN oldPen = (HPEN)SelectObject(hdc,pen);
 	MoveToEx(hdc, point[0].x, point[0].y, NULL);
 	LineTo(hdc, point[3].x, point[3].y);
 	SelectObject(hdc, oldPen);
 #if 1
-	myPolyBezier(hdc,b,e,c1,c2,negative);
+	alPolyBezier(hdc,b,e,c1,c2,negative);
 #else 
 	PolyBezier(hdc,point,4); 
 #endif
 }
 
-void drawBezier(HDC hdc, Points &points, float f, COLORREF color, int width, int d) {
+void drawBezier(HDC hdc, ALArrPoints &points, float f, COLORREF color, int width, int d) {
 	HPEN hPen = CreatePen(PS_SOLID, width, color);
 	HGDIOBJ hobj = SelectObject(hdc, hPen);
-	AlPoint b, e, n, c1, c2, c3;
+	ALPoint b, e, n, c1, c2, c3;
 	c3 = points[0];
 	c3.y = - c3.y;
 	for(int i=2; i<points.count(); i++){
@@ -235,27 +251,67 @@ void drawBezier(HDC hdc, Points &points, float f, COLORREF color, int width, int
 	drawOneBezier(hdc,b,e,c1,c2,false);
 	DeleteObject( SelectObject(hdc,hobj) );
 }
-
-void myPolyBezier(HDC hdc,AlPoint b, AlPoint e, AlPoint c1, AlPoint c2,bool negative) {
-	float t = 0.02;
-	MoveToEx(hdc, b.x, (negative?-1:1)*b.y, NULL);
-	while(t <= 1){
-		AlPoint	alp = bezierPoint(b,e,c1,c2,t);
+void alPolyBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1, ALPoint c2,bool negative) {
+	ALArrPoints points(50,5);
+	float t = 0;
+	while(t <= 1) {
+		ALPoint	alp = bezierPoint(b,e,c1,c2,t);
+		alp.w = b.w + (e.w-b.w)*t;
 		alp.y = (negative?-1:1)*alp.y;
+		points.append(alp);
 		t += 0.02;
-		LineTo(hdc,alp.x,alp.y);
 	}
+	aldrawPoly(hdc,points);
 }
-
 // b(t) = p0*(1-t)^3 + 3p1*t*(1-t)^2 + 3*p2*t^2(1-t) + p3*t^3
 float p0(float v, float t){ return v * cubic(1-t); }
 float p1(float v, float t){ return 3 * v * t * square( 1-t ); }
 float p2(float v, float t){ return 3 * v * square(t) * (1-t); }
 float p3(float v, float t){ return v * cubic(t); }
-AlPoint bezierPoint(AlPoint b, AlPoint e, AlPoint c1, AlPoint c2, float t){
-	AlPoint point = {
+ALPoint bezierPoint(ALPoint b, ALPoint e, ALPoint c1, ALPoint c2, float t){
+	ALPoint point = {
 		p0(b.x,t) + p1(c1.x,t) + p2(c2.x,t) + p3(e.x,t),
 		p0(b.y,t) + p1(c1.y,t) + p2(c2.y,t) + p3(e.y,t)
 	};
 	return point;
+}
+
+void aldrawPoly(HDC hdc,ALArrPoints &points) {
+	GdiPlusIniter gdiplusInit;
+	if(gdiplusInit.ok() && false) {
+		gdiplusDrawPoly(hdc,points,RGB(0xff,0x00,0x00));
+	}
+	else{ 
+		gdiDrawPoly(hdc,points,RGB(0xff,0x00,0x00));
+	}
+}
+
+void gdiDrawPoly(HDC hdc,ALArrPoints &points,COLORREF color) {
+	if(points.count() < 2) return;
+	MoveToEx(hdc, points[0].x, points[0].y, NULL);
+	HPEN pen = CreatePen(PS_SOLID, points[0].w, color);
+	HGDIOBJ oldPen = SelectObject(hdc, CreatePen(PS_SOLID, points[0].w, color));
+	MoveToEx(hdc, points[0].x, points[0].y, NULL);
+	for(int i=1; i<points.count(); i++) {
+		LineTo(hdc, points[i].x, points[i].y);
+		DeleteObject(SelectObject(hdc, CreatePen(PS_SOLID, points[i].w, color))); 
+	} 
+	DeleteObject(SelectObject(hdc, oldPen));
+}
+
+void gdiplusDrawPoly(HDC hdc,ALArrPoints &points,COLORREF c) {
+	if(points.count() < 2) return;
+	Graphics graphics(hdc);
+	graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+	Color color(GetRValue(c), GetGValue(c), GetBValue(c));
+	Pen pen(color);
+	pen.SetLineJoin(LineJoinRound);
+	pen.SetStartCap(LineCapRound);
+	pen.SetEndCap(LineCapRound);
+	for(int i=1; i<points.count(); i++) {
+		pen.SetWidth(points[i-1].w);
+		Point b(points[i-1].x, points[i-1].y);
+		Point e(points[i].x, points[i].y);
+		graphics.DrawLine(&pen,b,e);
+	} 
 }

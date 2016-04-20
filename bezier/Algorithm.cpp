@@ -13,25 +13,25 @@ using namespace Gdiplus;
 float square(float f) { return f*f; }
 float cubic(float f) { return f * square(f); } 
 
-float distance(AlPoint p1, AlPoint p2) {
+float distance(ALPoint p1, ALPoint p2) {
 	return sqrt( square(p1.x-p2.x) + square(p1.y-p2.y) );
 }
-Points::Points(int initSize, int increaseSize) {
+ALArrPoints::ALArrPoints(int initSize, int increaseSize) {
 	m_count = 0;
 	m_capability = initSize<=0 ? 1:initSize;
 	m_increaseSize = increaseSize;
-	int memSize = initSize*sizeof(AlPoint);
-	m_points = (AlPoint*)malloc(memSize);
+	int memSize = initSize*sizeof(ALPoint);
+	m_points = (ALPoint*)malloc(memSize);
 	memset(m_points, 0, memSize);
 }
 
-Points::~Points() {
+ALArrPoints::~ALArrPoints() {
 	if(m_points) free(m_points); 
 }
 
-bool Points::append(AlPoint point) {
+bool ALArrPoints::append(ALPoint point) {
 	if(m_capability==m_count){
-		if(!Increase()){
+		if(!increase()){
 			return false; 
 		}
 	}
@@ -39,21 +39,26 @@ bool Points::append(AlPoint point) {
 	return true;
 }
 
-bool Points::append(float x,float y) {
-	AlPoint point = {x, y};
+bool ALArrPoints::append(float x,float y) {
+	ALPoint point = {x, y, 0.1};
 	return append(point); 
 }
 
-AlPoint * Points::getPoint(int index) {
+bool ALArrPoints::append(float x,float y,float w) {
+	ALPoint point = {x, y, w};
+	return append(point); 
+}
+
+ALPoint * ALArrPoints::getPoint(int index) {
 	if(index >= m_count)
 		return NULL;
 	return m_points + index;
 }
 
-AlPoint& Points::operator[](unsigned int i) {
+ALPoint& ALArrPoints::operator[](unsigned int i) {
 	if(!m_points){ 
-		int size = sizeof(AlPoint)*m_capability;
-		m_points = (AlPoint*)malloc(size);
+		int size = sizeof(ALPoint)*m_capability;
+		m_points = (ALPoint*)malloc(size);
 		memset(m_points, 0, size); 
 	}
 	if( i>= m_count ){
@@ -63,13 +68,16 @@ AlPoint& Points::operator[](unsigned int i) {
 	return m_points[i];
 }
 
-bool Points::Increase() {
-	AlPoint *tmp = (AlPoint*)realloc(m_points, m_count+m_increaseSize); 
-	if(tmp) m_points = tmp;
+bool ALArrPoints::increase() {
+	ALPoint *tmp = (ALPoint*)realloc(m_points, (m_count+m_increaseSize)*sizeof(ALPoint)); 
+	if(tmp) {
+		m_capability += 5;
+		m_points = tmp;
+	}
 	return tmp ? true:false;
 }
 
-AlPoint bezierControlPoint(AlPoint b,AlPoint e,AlPoint n,AlPoint *c,float f) {
+ALPoint bezierControlPoint(ALPoint b,ALPoint e,ALPoint n,ALPoint *c,float f) {
 	if( f>0.5 ) f = 0.5;
 	else if( f<0.1 ) f = 0.1;
 	float a1 = atan2f(e.y - b.y, e.x - b.x);
@@ -78,9 +86,9 @@ AlPoint bezierControlPoint(AlPoint b,AlPoint e,AlPoint n,AlPoint *c,float f) {
 	AlLine line(r, e); 
 	float d = distance(b, e);
 	d = d * f;
-	AlPoint *ps = line.distancePointsTo(e.x, d);
+	ALPoint *ps = line.distancePointsTo(e.x, d);
 	d = distance(ps[0], e);
-	AlPoint point = ( distance(b, ps[0]) < distance(b, ps[1]) ) ?  ps[0]:ps[1];
+	ALPoint point = ( distance(b, ps[0]) < distance(b, ps[1]) ) ?  ps[0]:ps[1];
 	free(ps);
 	if(c) {
 		d = distance(e, n) * f;
@@ -91,19 +99,19 @@ AlPoint bezierControlPoint(AlPoint b,AlPoint e,AlPoint n,AlPoint *c,float f) {
 	return point;
 }
 
-AlLine::AlLine(float radian, AlPoint point) {
+AlLine::AlLine(float radian, ALPoint point) {
 	m_r = radian;
 	m_point = point;
 }
 
-AlLine::AlLine(AlPoint p1, AlPoint p2) {
+AlLine::AlLine(ALPoint p1, ALPoint p2) {
 	m_r = (p1.y-p2.y) / (p1.x-p2.x);
 	m_point = p1;
 } 
 
-AlPoint* AlLine::distancePointsTo(float x, float dist) {
+ALPoint* AlLine::distancePointsTo(float x, float dist) {
 	float y = m_r*(x-m_point.x) + m_point.y;
-	AlPoint *point = (AlPoint*)malloc(sizeof(AlPoint)*2);
+	ALPoint *point = (ALPoint*)malloc(sizeof(ALPoint)*2);
 	float t = sqrtf(square(dist)/(1+square(m_r)));
 	point[0].x = x + t;
 	point[1].x = x - t;
