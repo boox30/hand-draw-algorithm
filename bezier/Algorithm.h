@@ -40,4 +40,5 @@ private:
 AlPoint bezierControlPoint(AlPoint b,AlPoint e,AlPoint n,AlPoint *c,float f);
 float distance(AlPoint p1, AlPoint p2);
 float square(float f);
+float cubic(float f);
 void doDraw(Points points, float f);
