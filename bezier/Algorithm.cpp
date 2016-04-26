@@ -16,7 +16,7 @@ float cubic(float f) { return f * square(f); }
 float distance(ALPoint p1, ALPoint p2) {
 	return sqrt( square(p1.x-p2.x) + square(p1.y-p2.y) );
 }
-ALArrPoints::ALArrPoints(int initSize, int increaseSize) {
+AlpointsList::AlpointsList(int initSize, int increaseSize) {
 	m_count = 0;
 	m_capability = initSize<=0 ? 1:initSize;
 	m_increaseSize = increaseSize;
@@ -25,11 +25,11 @@ ALArrPoints::ALArrPoints(int initSize, int increaseSize) {
 	memset(m_points, 0, memSize);
 }
 
-ALArrPoints::~ALArrPoints() {
+AlpointsList::~AlpointsList() {
 	if(m_points) free(m_points); 
 }
 
-bool ALArrPoints::append(ALPoint point) {
+bool AlpointsList::append(ALPoint point) {
 	if(m_capability==m_count){
 		if(!increase()){
 			return false; 
@@ -39,23 +39,34 @@ bool ALArrPoints::append(ALPoint point) {
 	return true;
 }
 
-bool ALArrPoints::append(float x,float y) {
+bool AlpointsList::append(float x,float y) {
 	ALPoint point = {x, y, 0.1};
 	return append(point); 
 }
 
-bool ALArrPoints::append(float x,float y,float w) {
+bool AlpointsList::append(float x,float y,float w) {
 	ALPoint point = {x, y, w};
 	return append(point); 
 }
 
-ALPoint * ALArrPoints::getPoint(int index) {
+ALPoint AlpointsList::pup() {
+	ALPoint point = {0,0,0};
+	if( 0==m_count ) return point;
+	point = m_points[0];
+	for(int i=0; i<(m_count-1); i++){
+		m_points[i] = m_points[i+1];
+	}
+	m_count--;
+	return point; 
+}
+
+ALPoint * AlpointsList::getPoint(int index) {
 	if(index >= m_count)
 		return NULL;
 	return m_points + index;
 }
 
-ALPoint& ALArrPoints::operator[](unsigned int i) {
+ALPoint& AlpointsList::operator[](unsigned int i) {
 	if(!m_points){ 
 		int size = sizeof(ALPoint)*m_capability;
 		m_points = (ALPoint*)malloc(size);
@@ -68,7 +79,7 @@ ALPoint& ALArrPoints::operator[](unsigned int i) {
 	return m_points[i];
 }
 
-bool ALArrPoints::increase() {
+bool AlpointsList::increase() {
 	ALPoint *tmp = (ALPoint*)realloc(m_points, (m_count+m_increaseSize)*sizeof(ALPoint)); 
 	if(tmp) {
 		m_capability += 5;
@@ -77,9 +88,33 @@ bool ALArrPoints::increase() {
 	return tmp ? true:false;
 }
 
-ALPoint bezierControlPoint(ALPoint b,ALPoint e,ALPoint n,ALPoint *c,float f) {
-	if( f>0.5 ) f = 0.5;
-	else if( f<0.1 ) f = 0.1;
+ALPoint cubicBezierControlPoint(ALPoint b,ALPoint e,ALPoint n,ALPoint *c,float f) {
+#if 1
+	// 计算AB,BC的中点坐标,连接后记为线段M
+	float xm1 = (e.x + b.x)/2;
+	float ym1 = (e.y + b.y)/2;
+	float xm2 = (n.x + e.x)/2;
+	float ym2 = (n.y + e.y)/2;
+	// 计算线段AB,BC的长度,分别记为l1,l2
+	float l1 = distance(b, e);
+	float l2 = distance(e, n);
+	float k = l1/(l2+l1);
+	// 把线段M,以l1:l2的比例分割,分割点记为T
+	float xt = xm1 + (xm2-xm1) * k;
+	float yt = ym1 + (ym2-ym1) * k;
+	// 将线段M平行移动到顶点B,将线段上的分割点T对其到B,
+	// 线段的两个端点就是控制点!!!!,加上平滑因子f,计算控制点!!!
+	float xc1 = e.x - (xt - xm1) * f;
+	float yc1 = e.y - (yt - ym1) * f;
+	float xc2 = e.x + (xm2 - xt) * f;
+	float yc2 = e.y + (ym2 - yt) * f;
+	ALPoint ctrlPoint = {xc1, yc1, 0};
+	if( c ){
+		c->x = xc2; c->y = yc2;
+	}
+	return ctrlPoint;
+ #else
+	// 取角平分线的垂线上的点作为控制点的算法!!!!
 	float a1 = atan2f(e.y - b.y, e.x - b.x);
 	float a2 = atan2f(e.y - n.y, e.x - n.x);
 	float r = tan((a1+a2)/2 + M_PI_2);
@@ -97,6 +132,7 @@ ALPoint bezierControlPoint(ALPoint b,ALPoint e,ALPoint n,ALPoint *c,float f) {
 		free(ps);
 	}
 	return point;
+#endif
 }
 
 AlLine::AlLine(float radian, ALPoint point) {
@@ -120,3 +156,16 @@ ALPoint* AlLine::distancePointsTo(float x, float dist) {
 	return point;
 }
 
+// b(t) = p0*(1-t)^3 + 3p1*t*(1-t)^2 + 3*p2*t^2(1-t) + p3*t^3
+float p0(float v, float t){ return v * cubic(1-t); }
+float p1(float v, float t){ return 3 * v * t * square( 1-t ); }
+float p2(float v, float t){ return 3 * v * square(t) * (1-t); }
+float p3(float v, float t){ return v * cubic(t); }
+ALPoint calcuBezierPoint(ALPoint b, ALPoint e, ALPoint c1, ALPoint c2, float t){
+	ALPoint point = {
+		p0(b.x,t) + p1(c1.x,t) + p2(c2.x,t) + p3(e.x,t),
+		p0(b.y,t) + p1(c1.y,t) + p2(c2.y,t) + p3(e.y,t),
+		b.w + (e.w-b.w)*t
+	};
+	return point;
+}

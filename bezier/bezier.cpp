@@ -1,292 +1,162 @@
-// bezier.cpp : 定义应用程序的入口点。
-//
-
 #include "bezier.h"
 #include "Algorithm.h"
 #include <windows.h>
 #include <stdio.h>
 #include <math.h>
-#include <GdiPlus.h>
+
 using namespace Gdiplus;
 #pragma comment(lib, "gdiplus.lib")
 
+void drawCubicBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1, ALPoint c2);
+void drawPoly(HDC hdc,AlpointsList &points);
+void drawPloyGdi(HDC hdc,AlpointsList &points,COLORREF color);
+void drawPolyGdiPlus(HDC hdc,AlpointsList &points,COLORREF color);
+POINT alpoint2Point(ALPoint p,bool negative); 
+
 #define RadianToAngle(r) (int)(0.5 + 180*(r/M_PI))
-#define MAX_LOADSTRING 100
-
-// 全局变量:
-HINSTANCE hInst;								// 当前实例
-TCHAR szTitle[MAX_LOADSTRING];					// 标题栏文本
-TCHAR szWindowClass[MAX_LOADSTRING];			// 主窗口类名
-
-// 此代码模块中包含的函数的前向声明:
-ATOM				MyRegisterClass(HINSTANCE hInstance);
-BOOL				InitInstance(HINSTANCE, int);
-LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
-void OnPaintTest(HDC hdc);
-
-int APIENTRY wWinMain(HINSTANCE hInstance,
-                     HINSTANCE hPrevInstance,
-                     LPTSTR    lpCmdLine,
-                     int       nCmdShow)
-{
-	UNREFERENCED_PARAMETER(hPrevInstance);
-	UNREFERENCED_PARAMETER(lpCmdLine);
- 	// TODO: 在此放置代码。
-	MSG msg;
-	HACCEL hAccelTable;
-	// 初始化全局字符串
-	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-	LoadString(hInstance, IDC_BEZIER, szWindowClass, MAX_LOADSTRING);
-	MyRegisterClass(hInstance);
-	// 执行应用程序初始化:
-	if (!InitInstance (hInstance, nCmdShow))
-	{
-		return FALSE;
-	}
-	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_BEZIER));
-	// 主消息循环:
-	while (GetMessage(&msg, NULL, 0, 0)) {
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-	} 
-	return (int) msg.wParam;
-} 
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
-	WNDCLASSEX wcex;
-
-	wcex.cbSize = sizeof(WNDCLASSEX);
-
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
-	wcex.hInstance		= hInstance;
-	wcex.hIcon			= LoadIcon(hInstance, MAKEINTRESOURCE(IDI_BEZIER));
-	wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
-	wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
-	wcex.lpszMenuName	= MAKEINTRESOURCE(IDC_BEZIER);
-	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-	return RegisterClassEx(&wcex);
-}
-
-//
-//   函数: InitInstance(HINSTANCE, int)
-//
-//   目的: 保存实例句柄并创建主窗口
-//
-//   注释:
-//
-//        在此函数中，我们在全局变量中保存实例句柄并
-//        创建和显示主程序窗口。
-//
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-   HWND hWnd;
-
-   hInst = hInstance; // 将实例句柄存储在全局变量中
-
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
-
-   if (!hWnd)
-   {
-      return FALSE;
-   }
-
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
-   return TRUE;
-}
-
-//
-//  函数: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  目的: 处理主窗口的消息。
-//
-//  WM_COMMAND	- 处理应用程序菜单
-//  WM_PAINT	- 绘制主窗口
-//  WM_DESTROY	- 发送退出消息并返回
-//
-//
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	int wmId, wmEvent;
-	PAINTSTRUCT ps;
-	HDC hdc;
-
-	switch (message)
-	{
-	case WM_COMMAND:
-		wmId    = LOWORD(wParam);
-		wmEvent = HIWORD(wParam);
-		// 分析菜单选择:
-		switch (wmId)
-		{
-		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-		case IDM_EXIT:
-			DestroyWindow(hWnd);
-			break;
-		default:
-			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
-		break;
-	case WM_PAINT:{
-		hdc = BeginPaint(hWnd, &ps);
-		OnPaintTest(hdc);
-		// TODO: 在此添加任意绘图代码...
-		EndPaint(hWnd, &ps);
-		}
-		break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		break;
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	}
-	return 0;
-}
-
-// “关于”框的消息处理程序。
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	UNREFERENCED_PARAMETER(lParam);
-	switch (message)
-	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-		break;
-	}
-	return (INT_PTR)FALSE;
-} 
-
-int main(int argcount, void *args){
-	HINSTANCE instance = GetModuleHandle(NULL);
-	return wWinMain(instance,NULL,NULL,SW_SHOW);
-}
-
-void OnPaintTest(HDC hdc) {
-	ALPoint lefttop = {100, 100};
-	int length = 200;
-	ALArrPoints points(20, 5);
-	// 首先假设只有3个点!!!!!
-	points.append(200, 90, 1);
-	points.append(340, 170,10);
-	points.append(360, 260,6);
-	points.append(300, 340,8);
-	points.append(100, 180,3);
-	points.append(250, 200,0);
-	drawBezier(hdc, points, 0.3, RGB(0xff,0,0), 1, 3);
-}
-
-class GdiPlusIniter{
-public:
-	GdiPlusIniter() {
-		Gdiplus::GdiplusStartupInput StartupInput;  
-		m_ok = GdiplusStartup(&m_gdiplusToken,&StartupInput,NULL); 
-	}
-	~GdiPlusIniter(){
-		Gdiplus::GdiplusShutdown(m_gdiplusToken);
-	}
-	bool ok(){return m_ok==Status::Ok;}
-private:
-	ULONG_PTR m_gdiplusToken;
-	Gdiplus::Status m_ok;
-}; 
-POINT alpointToPoint(ALPoint p,bool negative)
-{
-	int n = negative?-1:1;
-	POINT r = {(long)p.x, n*(long)p.y};
-	return r;
-}
-
-void drawOneBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1,ALPoint c2,bool negative){
+void drawOneBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1,ALPoint c2){
 	POINT point[4];
-	point[0] = alpointToPoint(b, negative);
-	point[1] = alpointToPoint(c1,negative);
-	point[2] = alpointToPoint(c2,negative);
-	point[3] = alpointToPoint(e, negative);
+	point[0] = alpoint2Point(b);
+	point[1] = alpoint2Point(c1);
+	point[2] = alpoint2Point(c2);
+	point[3] = alpoint2Point(e);
 	HPEN pen =CreatePen(PS_SOLID, 1, RGB(0xa0,0xa0,0xa0));
 	HPEN oldPen = (HPEN)SelectObject(hdc,pen);
 	MoveToEx(hdc, point[0].x, point[0].y, NULL);
-	LineTo(hdc, point[3].x, point[3].y);
+	// LineTo(hdc, point[3].x, point[3].y);
 	SelectObject(hdc, oldPen);
 #if 1
-	alPolyBezier(hdc,b,e,c1,c2,negative);
+	drawCubicBezier(hdc,b,e,c1,c2);
 #else 
 	PolyBezier(hdc,point,4); 
 #endif
 }
-
-void drawBezier(HDC hdc, ALArrPoints &points, float f, COLORREF color, int width, int d) {
-	HPEN hPen = CreatePen(PS_SOLID, width, color);
-	HGDIOBJ hobj = SelectObject(hdc, hPen);
-	ALPoint b, e, n, c1, c2, c3;
-	c3 = points[0];
-	c3.y = - c3.y;
-	for(int i=2; i<points.count(); i++){
-		b = points[i-2];
-		e = points[i-1];
-		n = points[i];
-		c1 = c3; b.y = -b.y; e.y = -e.y; n.y = -n.y;
-		c2 = bezierControlPoint(b, e, n, &c3, 0.2);
-		drawOneBezier(hdc,b,e,c1,c2,true);
+#define ThroghtEveryPoint
+// #define DrawPolygonMacro
+void drawBezierSmoothPoly(HDC hdc, AlpointsList &points, float f, COLORREF color) {
+	if(points.count()<3) return;
+	GdiPlusIniter ginit;
+	Graphics *graphics = Graphics::FromHDC(hdc);
+	graphics->SetSmoothingMode(SmoothingModeHighQuality);
+	graphics->SetCompositingMode(CompositingModeSourceOver);
+	Pen pen(Color::Red);
+	pen.SetLineJoin(LineJoinRound);
+	pen.SetLineCap(LineCapRound,LineCapRound, DashCapRound);
+// 绘制多边形
+#if defined(DrawPolygonMacro)
+	pen.SetColor(Color::Blue);
+	pen.SetDashStyle(DashStyleDash);
+	for(int i=0; i<points.count() - 1; i++){
+		Point p1(points[i+0].x, -points[i+0].y);
+		Point p2(points[i+1].x, -points[i+1].y);
+		graphics->DrawLine(&pen, p1, p2 );
 	}
-	b = points[points.count()-2];
-	e = points[points.count()-1];
-	c1 = c3; c1.y = -c1.y; c2 = e;
-	drawOneBezier(hdc,b,e,c1,c2,false);
-	DeleteObject( SelectObject(hdc,hobj) );
+#endif
+#if defined(ThroghtEveryPoint)
+	ALPoint b, e, n, c1, c2, c3;
+	int last = 0;
+	for(int i=0; i<points.count()-1; i++){
+		if( distance(points[last], points[i+1])<4 ){
+			continue;
+		}
+		b = points[last];
+		e = points[i+1];
+		n = points[i+2];
+		c1 = last==0? points[0]:c3;
+		c2 = cubicBezierControlPoint(b, e, n, &c3, f);
+		{
+			// 绘制控制点!!!
+#if 0
+			pen.SetDashStyle(DashStyleDot);
+			pen.SetColor(Color::Green);
+			Point p1(c2.x, -c2.y);
+			Point p2(c3.x, -c3.y);
+			graphics->DrawEllipse(&pen, p1.X-1, p1.Y-1,2,2);
+			graphics->DrawEllipse(&pen, p2.X-1, p2.Y-1,2,2);
+			graphics->DrawLine(&pen, p1, p2);
+#endif
+		}
+		pen.SetDashStyle(DashStyleSolid);
+		pen.SetColor(Color::Red);
+		Point p1(b.x, -b.y);
+		Point p2(c1.x, -c1.y);
+		Point p3(c2.x, -c2.y);
+		Point p4(e.x, -e.y);
+		graphics->DrawBezier(&pen, p1,p2,p3,p4); 
+		last = i+1;
+	} 
+#else  // 使用顶点作为控制点!!!!!
+	pen.SetColor(Color::Red);
+	pen.SetDashStyle(DashStyleSolid);
+	int last = 0;
+	float bx,by,cx,cy,ex,ey;
+	for(int i=0; i<points.count(); i++){
+		bx = i==0?points[0].x:ex;
+		by = i==0?points[0].y:ey;
+		ex = (points[i+1].x + points[i+2].x)/2;
+		ey = (points[i+1].y + points[i+2].y)/2;
+		cx = points[i+1].x; cy = points[i+1].y;
+		// b(t) = (1-t)^2*p0 + 2t(1-t)*p1 + t^2*p2
+		float x0 = bx, y0 = -by;
+		for(float t=0.02; t<=1.0; t+=0.02){
+			float x1 = square(1-t)*bx + 2*t*(1-t)*cx + square(t)*ex;
+			float y1 = square(1-t)*by + 2*t*(1-t)*cy + square(t)*ey;
+			y1 = -y1;
+			graphics->DrawLine(&pen,x0, y0,x1,y1);
+			x0 = x1; y0 = y1;
+		}
+	}
+
+#endif
 }
-void alPolyBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1, ALPoint c2,bool negative) {
-	ALArrPoints points(50,5);
+
+POINT alpoint2Point(const ALPoint &point) {
+	POINT p = {point.x, -point.y};
+	return p; 
+}
+
+ALPoint point2AlPoint(const POINT &point) {
+	ALPoint p = {point.x, -point.y, 0}; 
+	return p;
+}
+
+void drawCubicBezier(HDC hdc,ALPoint b, ALPoint e, ALPoint c1, ALPoint c2) {
+	GdiPlusIniter ginit;
+	Graphics *graphics = Graphics::FromHDC(hdc);
+	graphics->SetSmoothingMode(SmoothingModeHighQuality);
+	Point p1(b.x, -b.y);
+	Point p2(c1.x, -c1.y);
+	Point p3(c2.x, -c2.y);
+	Point p4(e.x, -e.y);
+	Pen pen(Color::Red);
+	pen.SetLineJoin(LineJoinRound);
+	pen.SetStartCap(LineCapRound);
+	pen.SetEndCap(LineCapRound);
+	graphics->DrawBezier(&pen, p1,p2,p3,p4); 
+	/*
+	AlPointsArray points(50,5);
 	float t = 0;
 	while(t <= 1) {
-		ALPoint	alp = bezierPoint(b,e,c1,c2,t);
-		alp.w = b.w + (e.w-b.w)*t;
+		ALPoint	alp = calcuBezierPoint(b,e,c1,c2,t);
 		alp.y = (negative?-1:1)*alp.y;
 		points.append(alp);
 		t += 0.02;
 	}
-	aldrawPoly(hdc,points);
-}
-// b(t) = p0*(1-t)^3 + 3p1*t*(1-t)^2 + 3*p2*t^2(1-t) + p3*t^3
-float p0(float v, float t){ return v * cubic(1-t); }
-float p1(float v, float t){ return 3 * v * t * square( 1-t ); }
-float p2(float v, float t){ return 3 * v * square(t) * (1-t); }
-float p3(float v, float t){ return v * cubic(t); }
-ALPoint bezierPoint(ALPoint b, ALPoint e, ALPoint c1, ALPoint c2, float t){
-	ALPoint point = {
-		p0(b.x,t) + p1(c1.x,t) + p2(c2.x,t) + p3(e.x,t),
-		p0(b.y,t) + p1(c1.y,t) + p2(c2.y,t) + p3(e.y,t)
-	};
-	return point;
+	drawPoly(hdc,points);
+	*/
 }
 
-void aldrawPoly(HDC hdc,ALArrPoints &points) {
+void drawPoly(HDC hdc,AlpointsList &points) {
 	GdiPlusIniter gdiplusInit;
-	if(gdiplusInit.ok() && false) {
-		gdiplusDrawPoly(hdc,points,RGB(0xff,0x00,0x00));
+	if(gdiplusInit.ok()) {
+		drawPolyGdiPlus(hdc,points,RGB(0xff,0x00,0x00));
 	}
 	else{ 
-		gdiDrawPoly(hdc,points,RGB(0xff,0x00,0x00));
+		drawPloyGdi(hdc,points,RGB(0xff,0x00,0x00));
 	}
 }
 
-void gdiDrawPoly(HDC hdc,ALArrPoints &points,COLORREF color) {
+void drawPloyGdi(HDC hdc,AlpointsList &points,COLORREF color) {
 	if(points.count() < 2) return;
 	MoveToEx(hdc, points[0].x, points[0].y, NULL);
 	HPEN pen = CreatePen(PS_SOLID, points[0].w, color);
@@ -299,10 +169,10 @@ void gdiDrawPoly(HDC hdc,ALArrPoints &points,COLORREF color) {
 	DeleteObject(SelectObject(hdc, oldPen));
 }
 
-void gdiplusDrawPoly(HDC hdc,ALArrPoints &points,COLORREF c) {
+void drawPolyGdiPlus(HDC hdc,AlpointsList &points,COLORREF c) {
 	if(points.count() < 2) return;
 	Graphics graphics(hdc);
-	graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+	graphics.SetSmoothingMode(SmoothingModeHighQuality);
 	Color color(GetRValue(c), GetGValue(c), GetBValue(c));
 	Pen pen(color);
 	pen.SetLineJoin(LineJoinRound);
@@ -314,4 +184,20 @@ void gdiplusDrawPoly(HDC hdc,ALArrPoints &points,COLORREF c) {
 		Point e(points[i].x, points[i].y);
 		graphics.DrawLine(&pen,b,e);
 	} 
+}
+
+GdiPlusIniter::GdiPlusIniter()
+{
+	Gdiplus::GdiplusStartupInput StartupInput;  
+	m_ok = GdiplusStartup(&m_gdiplusToken,&StartupInput,NULL);
+}
+
+GdiPlusIniter::~GdiPlusIniter()
+{
+	Gdiplus::GdiplusShutdown(m_gdiplusToken);
+}
+
+bool GdiPlusIniter::ok()
+{
+	return m_ok==Status::Ok;
 }
