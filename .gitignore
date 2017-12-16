@@ -1,0 +1,6 @@
+Debug/
+Release/
+!*.exe
+bin/
+bezier/.vs/
+

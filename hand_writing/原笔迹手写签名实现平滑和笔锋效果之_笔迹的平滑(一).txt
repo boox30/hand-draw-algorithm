@@ -1,0 +1,313 @@
+之前由于公司的研发需求, 要实现一种手写笔迹算法,  要求能够保持原笔迹平滑,并有笔锋的效果,
+
+在网上看了一些资料, 资料很多,不过真正能够达到理想效果的, 一个都没找到..可以说大部分网上的算法其实都很废!
+
+我看到最靠谱的一篇文章是这个:Interpolation with Bezier Curves
+
+但是即使按照这篇文章讲的方法去实现手写笔迹, 你也会发现理论和实际的差距. 表现的效果也非常的不理想.
+
+而且, 这篇文章还只是涉及到了笔迹平滑的问题, 没有涉及到如何解决笔锋的问题
+
+经过我一段时间的研究, 终于在上厕所的时候(有没有被duang了一下的感觉, 哈哈~O(∩_∩)O), 想出来了一种方法..先给大家展示两张在正式产品中的效果图:
+
+前面两张图片是在手机上测试的效果,最后一张是在电脑上用鼠标写出来的效果.
+
+
+
+当然, 必须承认, 图片中展示的效果效果的文字, 我反复写了很多次...随便画几条线大概是这样:
+
+
+
+如果你还对贝塞尔曲线不了解, 我推荐查看这篇文章:史上最全的贝塞尔曲线(Bezier)全解,   所以, 在这里我会假设读者已经对Bezier曲线已经比较了解.
+
+本文主要讲解 如何通过已知所有笔迹点, 计算出控制点, 使用3次bezier曲线拟合笔迹, 达到笔迹平滑的效果, 解决笔迹平滑的问题,.
+
+除了本篇文章意外, 后面应该还会有两篇文章:
+
+第二篇:介绍自己开发的一种笔迹拟合算法.
+
+第三篇:主要介绍实现笔锋的效果.并提供最终的c++对此算法的实现的源代码, 还有demo.
+
+ Bezier曲线是通过简单地指定端点和中间的控制点(Control Point)来描绘出一条光滑的曲线, 三次贝塞尔曲线的效果是图片中这样:
+
+
+
+当红色的圆点代表原笔迹点时, 想必大家想要的效果是下面图片中的蓝色线条, 而不是红色线条吧:
+
+
+
+贝赛尔曲线拟合会经过前后两个端点, 但不会经过中间的控制点,所以, 我们通过贝塞尔曲线来拟合笔迹点的时候, 是要:
+
+对于所有的笔迹点, 每相邻的一对笔迹点作为前后端点来绘制Bezier曲线, 所有我们需要找出一些满足某种规律的点作为这些端点中间的控制点.
+
+下面请看下图:
+
+
+
+图中, 点A, B, C为我们的原笔迹点, B' 和 B''为我们计算出来的控制点.
+
+计算控制点的方法是:
+
+1) 设定一个0到1的系数k,  在AB和BC上找到两点, b'和c', 使得距离比值, Bb' / AB = Bc' / BC = k  , 计算出两个点 b' 和 c',
+
+2) 然后在b' c'这条线段上再找到一个点 t, 且线段的长度满足比例: b't / tc' = AB / BC,
+
+3) 把b' 和 c', 沿着 点 t 到 点B的方向移动, 直到 t 和 B重合. 由b'移动后得到 B', 由 c'移动后的距离得到B'', B'和B''就是我们要计算的位于顶点B附近的两个控制点.
+
+实际项目过程中, 使用下面的规则进行绘制笔迹:
+
+1) 当我们在手写原笔迹绘制的时候, 得到第3个点(假设为ABC)的时候, 可以计算出B点附近的两个控制点., 由于是起始点, 所以直接把点A作为第一个控制点, 则AAB'B可以画出点A到点B的平滑曲线.
+
+2) 当得到第4个点(假设为D)的时候, 我们通过BCD, 计算出在点C附近的两个控制点, C'和C'', 通过BB''C'C绘制出B到C的平滑曲线..
+
+3) 当得到第i个点的时候, 进行第2个步骤.........
+
+4) 当得到最后一个点Z的时候,  直接把Z作为第二个控制点(假设前一个点为Y),  即, 使用YY'ZZ来绘制Bezier曲线.
+
+为了让阅读者能够更好的理解, 用Python实现了这个算法, 鼠标点击空白处可以增加笔迹点, 选中笔迹点可以动态拖动, 单击已有笔迹点执行删除:
+
+效果图如下:
+
+
+
+Python代码我就不再解释了, 直接提供出来:
+
+  1 #!/usr/bin/env python
+  2 # -*- coding: utf-8 -*-
+  3 import numpy as np
+  4 from scipy.special import comb, perm
+  5 import matplotlib.pyplot as plt
+  6 
+  7 plt.rcParams['font.sans-serif'] = ['SimHei']
+  8 # plt.rcParams['font.sans-serif'] = ['STXIHEI']
+  9 plt.rcParams['axes.unicode_minus'] = False
+ 10 
+ 11 class Handwriting:
+ 12     def __init__(self, line):
+ 13         self.line = line
+ 14         self.index_02 = None    # 保存拖动的这个点的索引
+ 15         self.press = None       # 状态标识，1为按下，None为没按下
+ 16         self.pick = None        # 状态标识，1为选中点并按下,None为没选中
+ 17         self.motion = None      # 状态标识，1为进入拖动,None为不拖动
+ 18         self.xs = list()        # 保存点的x坐标
+ 19         self.ys = list()        # 保存点的y坐标
+ 20         self.cidpress = line.figure.canvas.mpl_connect('button_press_event', self.on_press)  # 鼠标按下事件
+ 21         self.cidrelease = line.figure.canvas.mpl_connect('button_release_event', self.on_release)  # 鼠标放开事件
+ 22         self.cidmotion = line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)  # 鼠标拖动事件
+ 23         self.cidpick = line.figure.canvas.mpl_connect('pick_event', self.on_picker)  # 鼠标选中事件
+ 24 
+ 25         self.ctl_point_1 = None
+ 26 
+ 27     def on_press(self, event):  # 鼠标按下调用
+ 28         if event.inaxes != self.line.axes: return
+ 29         self.press = 1
+ 30 
+ 31     def on_motion(self, event):  # 鼠标拖动调用
+ 32         if event.inaxes != self.line.axes: return
+ 33         if self.press is None: return
+ 34         if self.pick is None: return
+ 35         if self.motion is None:  # 整个if获取鼠标选中的点是哪个点
+ 36             self.motion = 1
+ 37             x = self.xs
+ 38             xdata = event.xdata
+ 39             ydata = event.ydata
+ 40             index_01 = 0
+ 41             for i in x:
+ 42                 if abs(i - xdata) < 0.02:  # 0.02 为点的半径
+ 43                     if abs(self.ys[index_01] - ydata) < 0.02: break
+ 44                 index_01 = index_01 + 1
+ 45             self.index_02 = index_01
+ 46         if self.index_02 is None: return
+ 47         self.xs[self.index_02] = event.xdata  # 鼠标的坐标覆盖选中的点的坐标
+ 48         self.ys[self.index_02] = event.ydata
+ 49         self.draw_01()
+ 50 
+ 51     def on_release(self, event):  # 鼠标按下调用
+ 52         if event.inaxes != self.line.axes: return
+ 53         if self.pick is None:  # 如果不是选中点，那就添加点
+ 54             self.xs.append(event.xdata)
+ 55             self.ys.append(event.ydata)
+ 56         if self.pick == 1 and self.motion != 1:  # 如果是选中点，但不是拖动点，那就降阶
+ 57             x = self.xs
+ 58             xdata = event.xdata
+ 59             ydata = event.ydata
+ 60             index_01 = 0
+ 61             for i in x:
+ 62                 if abs(i - xdata) < 0.02:
+ 63                     if abs(self.ys[index_01] - ydata) < 0.02: break
+ 64                 index_01 = index_01 + 1
+ 65             self.xs.pop(index_01)
+ 66             self.ys.pop(index_01)
+ 67         self.draw_01()
+ 68         self.pick = None  # 所有状态恢复，鼠标按下到稀放为一个周期
+ 69         self.motion = None
+ 70         self.press = None
+ 71         self.index_02 = None
+ 72 
+ 73     def on_picker(self, event):  # 选中调用
+ 74         self.pick = 1
+ 75 
+ 76     def draw_01(self):  # 绘图
+ 77         self.line.clear()  # 不清除的话会保留原有的图
+ 78         self.line.set_title('Bezier曲线拟合手写笔迹')
+ 79         self.line.axis([0, 1, 0, 1])  # x和y范围0到1
+ 80         # self.bezier(self.xs, self.ys)  # Bezier曲线
+ 81         self.all_curve(self.xs, self.ys)
+ 82         self.line.scatter(self.xs, self.ys, color='b', s=20, marker="o", picker=5)  # 画点
+ 83         self.line.plot(self.xs, self.ys, color='black', lw=0.5)  # 画线
+ 84         self.line.figure.canvas.draw()  # 重构子图
+ 85 
+ 86     # def list_minus(self, a, b):
+ 87     #     list(map(lambda x, y: x - y, middle, begin))
+ 88 
+ 89     def controls(self, k, begin, middle, end):
+ 90         # if k > 0.5 or k <= 0:
+ 91         #     print('value k not invalid, return!')
+ 92         #     return
+ 93 
+ 94         diff1 = middle - begin
+ 95         diff2 = end - middle
+ 96 
+ 97         l1 = (diff1[0] ** 2 + diff1[1] ** 2) ** (1 / 2)
+ 98         l2 = (diff2[0] ** 2 + diff2[1] ** 2) ** (1 / 2)
+ 99 
+100         first = middle - (k * diff1)
+101         second = middle + (k * diff2)
+102 
+103         c = first + (second - first) * (l1 / (l2 + l1))
+104 
+105         # self.line.text(begin[0] - 0.2, begin[1] + 1.5, 'A', fontsize=12, verticalalignment="top",
+106         #                horizontalalignment="left")
+107         # self.line.text(middle[0] - 0.2, middle[1] + 1.5, 'B', fontsize=12, verticalalignment="top",
+108         #                horizontalalignment="left")
+109         # self.line.text(end[0] + 0.2, end[1] + 1.5, 'C', fontsize=12, verticalalignment="top",
+110         #                horizontalalignment="left")
+111         # xytext = [(first[0] + second[0]) / 2, min(first[1], second[1]) - 10]
+112         #
+113         arrow_props = dict(arrowstyle="<-", connectionstyle="arc3")
+114         # self.line.annotate('', first, xytext=xytext, arrowprops=dict(arrowstyle="<-", connectionstyle="arc3,rad=-.1"))
+115         # self.line.annotate('', c, xytext=xytext, arrowprops=arrow_props)
+116         # self.line.annotate('', second, xytext=xytext, arrowprops=dict(arrowstyle="<-", connectionstyle="arc3,rad=.1"))
+117 
+118         # label = '从左到右3个点依次分别为b\', c\', t,\n' \
+119         #         '满足条件 k = |b\'B| / |AB|, k = |c\'B| / |CB|\n' \
+120         #         '然后把线段(b\'c\')按 t 到 B的路径移动,\n' \
+121         #         '最后得到的两个端点就是我们要求的以B为顶点的控制点'
+122         # self.line.text(xytext[0], xytext[1], label, verticalalignment="top", horizontalalignment="center")
+123         self.line.plot([first[0], c[0], second[0]], [first[1], c[1], second[1]], linestyle='dashed', color='violet', marker='o', lw=0.3)
+124 
+125         first_control = first + middle - c
+126         second_control = second + middle - c
+127 
+128         # self.line.text(first_control[0] - 0.2, first_control[1] + 1.5, '控制点B\'', fontsize=9, verticalalignment="top",
+129         #                horizontalalignment="left")
+130         # self.line.text(second_control[0] + 0.2, second_control[1] + 1.5, '控制点B\'\'', fontsize=9,
+131         #                verticalalignment="top", horizontalalignment="left")
+132         x_s = [first_control[0], second_control[0]]
+133         y_s = [first_control[1], second_control[1]]
+134 
+135         # self.line.annotate('', xy=middle, xytext=c, arrowprops=dict(facecolor='b' headlength=10, headwidth=25, width=20))
+136         arrow_props['facecolor'] = 'blue'
+137         # arrow_props['headlength'] = 5
+138         # arrow_props['headwidth'] = 10
+139         # arrow_props['width'] = 5
+140         # self.line.annotate('', xy=c, xytext=middle, arrowprops=arrow_props)
+141         # self.line.annotate('', xy=first, xytext=first_control, arrowprops=arrow_props)
+142         # self.line.annotate('', xy=second, xytext=second_control, arrowprops=arrow_props)
+143         # self.line.plot([begin[0], middle[0], end[0]], [begin[1], middle[1], end[1]], lw=1.0, marker='o')
+144         self.line.plot(x_s, y_s, marker='o', lw=1, color='r', linestyle='dashed')
+145         # self.line.plot(x_s, y_s, lw=1.0)
+146 
+147         return first_control, second_control
+148 
+149     def all_curve(self, xs, ys):
+150         self.ctl_point_1 = None
+151         le = len(xs)
+152         if le < 3: return
+153 
+154         begin = [xs[0], ys[0]]
+155         middle = [xs[1], ys[1]]
+156         end = [xs[2], ys[2]]
+157         self.one_curve(begin, middle, end)
+158 
+159         for i in range(3, le):
+160             begin = middle
+161             middle = end
+162             end = [xs[i], ys[i]]
+163             self.one_curve(begin, middle, end)
+164 
+165         end = [xs[le - 1], ys[le - 1]]
+166         x = [middle[0], self.ctl_point_1[0], end[0]]
+167         y = [middle[1], self.ctl_point_1[1], end[1]]
+168         self.bezier(x, y)
+169 
+170     def one_curve(self, begin, middle, end):
+171         ctl_point1 = self.ctl_point_1
+172 
+173         begin = np.array(begin)
+174         middle = np.array(middle)
+175         end = np.array(end)
+176 
+177         ctl_point2, self.ctl_point_1 = self.controls(0.3, np.array(begin), np.array(middle), np.array(end))
+178         if ctl_point1 is None: ctl_point1 = begin
+179 
+180         xs = [begin[0], ctl_point1[0], ctl_point2[0], middle[0]]
+181         ys = [begin[1], ctl_point1[1], ctl_point2[1], middle[1]]
+182         self.bezier(xs, ys)
+183 
+184         # xs = [middle[0], self.ctl_point_1[0], end[0], end[0]]
+185         # ys = [middle[1], self.ctl_point_1[1], end[1], end[1]]
+186         # self.bezier(xs, ys)
+187 
+188     def bezier(self, *args):  # Bezier曲线公式转换，获取x和y
+189         t = np.linspace(0, 1)  # t 范围0到1
+190         le = len(args[0]) - 1
+191 
+192         self.line.plot(args[0], args[1], marker='o', color='r', lw=0.8)
+193         le_1 = 0
+194         b_x, b_y = 0, 0
+195         for x in args[0]:
+196             b_x = b_x + x * (t ** le_1) * ((1 - t) ** le) * comb(len(args[0]) - 1, le_1)  # comb 组合，perm 排列
+197             le = le - 1
+198             le_1 = le_1 + 1
+199 
+200         le = len(args[0]) - 1
+201         le_1 = 0
+202         for y in args[1]:
+203             b_y = b_y + y * (t ** le_1) * ((1 - t) ** le) * comb(len(args[0]) - 1, le_1)
+204             le = le - 1
+205             le_1 = le_1 + 1
+206 
+207         color = "yellowgreen"
+208         if len(args) > 2 : color = args[2]
+209         self.line.plot(b_x, b_y, color=color, linewidth='3')
+210 
+211 fig = plt.figure(2, figsize=(12, 6))
+212 ax = fig.add_subplot(111)  # 一行一列第一个子图
+213 ax.set_title('手写笔迹贝赛尔曲线, 计算控制点图解')
+214 
+215 handwriting = Handwriting(ax)
+216 plt.xlabel('X')
+217 plt.ylabel('Y')
+218 
+219 # begin = np.array([20, 6])
+220 # middle = np.array([30, 40])
+221 # end = np.array([35, 4])
+222 # handwriting.one_curve(begin, middle, end)
+223 # handwriting.controls(0.2, begin, middle, end)
+224 plt.show()
+大家可能觉得这个算法已经比较完美了, 下面我指出这这种算法的几个缺点:
+
+1) 在实际交互过程中, 这种方法需要3次贝塞尔曲线来拟合, 用户输入完第3个点,才能绘制第一条曲线, 第4个点才能绘制第2条曲线, 这种反馈不及时的感觉非常差.
+
+2) 每次都要计算控制点, 非常麻烦, 并且还影响效率.
+
+在下一篇文章中, 我会介绍自己实现的解决了这些缺点的一种算法.
+
+另外, 吐槽一下啊, 公司老板拖欠两个月工资了,  穷得叮当响, 每天吃8块钱的蛋炒饭.真是看不起这样的老板!!!!!
+
+大家如果大家觉得这篇文章对您有帮助, 又愿意打赏一些银两, 请拿起你的手机, 打开你的微信, 扫一扫下方二维码, 作为一个有骨气的程序员攻城狮, 我非常愿意接受大家的支助...哈哈哈!!!
+
+
+
+ 

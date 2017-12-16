@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27004.2010
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bezier", "bezier.vcxproj", "{9FF91CD9-73F5-4A09-B5F9-4DD68295AB7C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9FF91CD9-73F5-4A09-B5F9-4DD68295AB7C}.Debug|x86.ActiveCfg = Debug|Win32
+		{9FF91CD9-73F5-4A09-B5F9-4DD68295AB7C}.Debug|x86.Build.0 = Debug|Win32
+		{9FF91CD9-73F5-4A09-B5F9-4DD68295AB7C}.Release|x86.ActiveCfg = Release|Win32
+		{9FF91CD9-73F5-4A09-B5F9-4DD68295AB7C}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {67F14CE1-1DB1-42A9-BF15-73508A89C5F3}
+	EndGlobalSection
+EndGlobal

@@ -1,21 +1,29 @@
-#include "bezier.h"
+// #include "bezier.h"
 #include <windows.h>
 #include <windowsx.h>
 #include <stdio.h>
 #include <iostream>
+#include "Resource.h"
+
+#include "math/z_gdi+_render.h"
+
+#pragma warning(disable:4244)
 using namespace Gdiplus;
 #define MAX_LOADSTRING 100
 // 全局变量:
-HINSTANCE hInst;								// 当前实例
-TCHAR szTitle[MAX_LOADSTRING];					// 标题栏文本
-TCHAR szWindowClass[MAX_LOADSTRING];			// 主窗口类名
-AlpointsList g_points(200, 100);
+HINSTANCE hInst;							// 当前实例
+TCHAR szTitle[MAX_LOADSTRING];			// 标题栏文本
+TCHAR szWindowClass[MAX_LOADSTRING];		// 主窗口类名
+
+Z_HandwritingRender g_hw_render(1.0f, 6.0f);
+
+// AlpointsList g_points(200, 100);
 // 此代码模块中包含的函数的前向声明:
-ATOM				MyRegisterClass(HINSTANCE hInstance);
-BOOL				InitInstance(HINSTANCE, int);
+ATOM		MyRegisterClass(HINSTANCE hInstance);
+BOOL		InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
-void OnPaintTest(HDC hdc);
+void OnPaint(HDC hdc, RECT r);
 void OnMouseMove(WPARAM wparam, LPARAM lparam);
 
 
@@ -49,6 +57,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 	} 
 	return (int) msg.wParam;
 } 
+
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEX wcex;
@@ -56,7 +65,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
 	wcex.style			= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= WndProc;
+	wcex.lpfnWndProc		= WndProc;
 	wcex.cbClsExtra		= 0;
 	wcex.cbWndExtra		= 0;
 	wcex.hInstance		= hInstance;
@@ -124,22 +133,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_PAINT: {
 		hdc = BeginPaint(hWnd, &ps);
-		OnPaintTest(hdc);
+		OnPaint(hdc, ps.rcPaint);
 		EndPaint(hWnd, &ps);
 		}
 		break;
 	case WM_CREATE:{
 		g_hwnd = hWnd;
-				   }
-				   break;
+		RECT r;
+		GetClientRect(hWnd, &r);
+		g_hw_render.init_memHdc(r.right - r.left, r.bottom - r.top);
+		}
+		break;
 	case WM_MOUSEMOVE:{
 		OnMouseMove(wParam, lParam);
-					  }
-					  break;
-	case WM_LBUTTONDOWN:{
-		g_points.setEmpty();
-	}
-	break;
+		}
+		break;
+	case WM_LBUTTONDOWN:
+		g_hw_render.insert_first(GET_X_LPARAM(lParam), -GET_Y_LPARAM(lParam));
+		break;
+	case WM_LBUTTONUP: {
+			RECT update_rect;
+			g_hw_render.insert_last(GET_X_LPARAM(lParam), -GET_Y_LPARAM(lParam));
+			g_hw_render.draw_to_hdc(NULL, &update_rect);
+			InflateRect(&update_rect, 5, 5);
+			InvalidateRect(g_hwnd, NULL, true);
+			UpdateWindow(g_hwnd);
+		}
+		break; 
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
@@ -173,48 +193,21 @@ int main(int argcount, void *args){
 	return wWinMain(instance,NULL,NULL,SW_SHOW);
 }
 
-void OnPaintTest(HDC hdc) {
-#if 0
-	GdiPlusIniter gdiplus;
-	if(!gdiplus.ok()) {
-		std::cout<<"gdi+ init faild!!!!!"<<std::endl;
-		return;
-	}
-	Graphics graphics(hdc);
-	graphics.SetSmoothingMode(SmoothingModeHighQuality);
-	Pen pen(Color::Red);
-	pen.SetWidth(2);
-	pen.SetLineJoin(LineJoinRound);
-	pen.SetLineCap(LineCapRound, LineCapRound, DashCapRound);
-	for(int i=0; i<g_points.count(); i++){
-		Point b((int)g_points[i].x,  (int)-g_points[i].y);
-		Point e((int)g_points[i+1].x,(int)-g_points[i+1].y);
-		graphics.DrawLine(&pen, b, e);
-	}
-#else
-	/*
-	g_points.setEmpty();
-	g_points.append(100,-140);
-	g_points.append(150,-200);
-	g_points.append(135,-140);
-	g_points.append(170,-180);
-	g_points.append(250,-200);
-	g_points.append(100,-100);
-	g_points.append(190,-80);
-	g_points.append(200,-150);
-	g_points.append(270,-70);
-	g_points.append(300,-200);
-	g_points.append(400,-170);
-	g_points.append(240,-350);
-	//*/
-	drawBezierSmoothPoly(hdc,g_points,1,RGB(0xff,0,0));
-#endif
+void OnPaint(HDC hdc, RECT r) {
+	g_hw_render.copy_to_hdc(hdc, r);
 }
 
 void OnMouseMove(WPARAM wparam, LPARAM lparam) {
 	if( (wparam & MK_LBUTTON)!=MK_LBUTTON ) {
 		return;
-	}
-	g_points.append(GET_X_LPARAM(lparam), -GET_Y_LPARAM(lparam), 1);
-	InvalidateRect(g_hwnd, NULL, true);
+	} 
+	// 内部使用的是坐标系, Y的方向是从上到下,
+	// 所以需要 把Y值先取反再传入
+	g_hw_render.insert(GET_X_LPARAM(lparam), -GET_Y_LPARAM(lparam)); 
+	RECT update_rect;
+	g_hw_render.draw_to_hdc(NULL, &update_rect); 
+	InflateRect(&update_rect, 5, 5);
+	InvalidateRect(g_hwnd, &update_rect, true);
+	UpdateWindow(g_hwnd);
 }
+#pragma warning(default:4244)

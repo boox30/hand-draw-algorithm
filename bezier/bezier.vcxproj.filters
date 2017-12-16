@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Algorithm.cpp" />
+    <ClCompile Include="bezier.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="math\z_gdi+_render.cpp">
+      <Filter>math</Filter>
+    </ClCompile>
+    <ClCompile Include="math\z_math.c">
+      <Filter>math</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Algorithm.h" />
+    <ClInclude Include="bezier.h" />
+    <ClInclude Include="Resource.h" />
+    <ClInclude Include="math\z_gdi+_render.h">
+      <Filter>math</Filter>
+    </ClInclude>
+    <ClInclude Include="math\z_math.h">
+      <Filter>math</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="bezier.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="bezier.ico" />
+    <None Include="ReadMe.txt" />
+    <None Include="small.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="math">
+      <UniqueIdentifier>{7b29d460-839f-4f4c-beca-9ad248ef6596}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
