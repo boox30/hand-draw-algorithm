@@ -48,6 +48,9 @@ Z_HandwritingRender::~Z_HandwritingRender()
 { 
 	if (m_mem_hdc) DeleteDC(m_mem_hdc);
 	if (m_mem_bmp) DeleteBitmap(m_mem_bmp);
+
+	if (m_cur_path) z_drop_fpoint_array(m_cur_path);
+	if (m_arr_list) z_drop_fpoint_arraylist(m_arr_list);
 }
 
 void Z_HandwritingRender::init_memHdc(unsigned int cx, unsigned int cy)

@@ -15,7 +15,7 @@ HINSTANCE hInst;							// 当前实例
 TCHAR szTitle[MAX_LOADSTRING];			// 标题栏文本
 TCHAR szWindowClass[MAX_LOADSTRING];		// 主窗口类名
 
-Z_HandwritingRender g_hw_render(1.0f, 6.0f);
+Z_HandwritingRender g_hw_render(1.0f, 5.0f);
 
 // AlpointsList g_points(200, 100);
 // 此代码模块中包含的函数的前向声明:
