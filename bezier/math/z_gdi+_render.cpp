@@ -1,3 +1,14 @@
+/*
+ * =====================================================================================
+ *       Filename:  z_gdi_render.cpp
+ *    Description:  
+ *        Version:  2.0
+ *        Created:  06/23/2016 14:53:43
+ *       Revision:  none
+ *         Author:  zl(88911562@qq.com), 
+ *   Organization:  
+ * =====================================================================================
+ */
 #include "z_gdi+_render.h"
 #pragma comment(lib, "gdiplus.lib")
 
@@ -179,7 +190,7 @@ bool Z_HandwritingRender::draw_to_hdc(HDC hdc, RECT *o_rect)
 	if (o_rect) memcpy(o_rect, &rect, sizeof(RECT)); 
 	if (m_mem_hdc && !IsRectEmpty(&rect)) {
 // 		BitBlt(hdc, l, t, r - l, b - t, m_mem_hdc, l, t, SRCCOPY); 
-		BitBlt(hdc, 0, 0, m_cx, m_cy, m_mem_hdc, 0, 0, SRCCOPY); 
+// 		BitBlt(hdc, 0, 0, m_cx, m_cy, m_mem_hdc, 0, 0, SRCCOPY); 
 	}
 	return true; 
 }
