@@ -63,8 +63,11 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	WNDCLASSEX wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
-
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
+	DWORD dwStyle = CS_HREDRAW | CS_VREDRAW;
+	dwStyle &= ~(WS_SIZEBOX);     
+	dwStyle &= ~(WS_MAXIMIZEBOX);
+	dwStyle &= ~(WS_MINIMIZEBOX);
+	wcex.style = dwStyle;
 	wcex.lpfnWndProc		= WndProc;
 	wcex.cbClsExtra		= 0;
 	wcex.cbWndExtra		= 0;
@@ -93,8 +96,11 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    HWND hWnd;
 
    hInst = hInstance; // 将实例句柄存储在全局变量中
-
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+   DWORD style = WS_OVERLAPPEDWINDOW;
+   style &= ~(WS_SIZEBOX);
+   style &= ~(WS_MAXIMIZEBOX);
+   style &= ~(WS_MINIMIZEBOX);
+   hWnd = CreateWindow(szWindowClass, szTitle, style,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
    if (!hWnd)

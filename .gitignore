@@ -3,4 +3,4 @@ Release/
 !*.exe
 bin/
 bezier/.vs/
-
+*.user
