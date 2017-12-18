@@ -184,6 +184,11 @@ void  z_fpoint_differential_add(z_fpoint_array *a, z_fpoint p) {
         return;
     }
 
+// #define bad_show
+#ifdef bad_show
+    z_fpoint_add(a, p);
+	return;
+#endif
 	float max_diff = 0.1f;
     z_fpoint *last = a->point + (a->len-1);
     z_point sp = last->p;

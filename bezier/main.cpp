@@ -207,6 +207,10 @@ void OnMouseMove(WPARAM wparam, LPARAM lparam) {
 	if( (wparam & MK_LBUTTON)!=MK_LBUTTON ) {
 		return;
 	} 
+
+	// todo:还有一种方法, 专门用一个线程, 在内存中绘制bezier曲线, 线程绘制完毕后, 
+	// 通过postmessage通知主窗口, 主窗口只需要拷贝图像就行了
+
 	// 内部使用的是坐标系, Y的方向是从上到下,
 	// 所以需要 把Y值先取反再传入
 	g_hw_render.insert(GET_X_LPARAM(lparam), -GET_Y_LPARAM(lparam)); 
